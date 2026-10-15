@@ -5,7 +5,21 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "light",    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Event Reporter to take photographs.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Event Reporter to capture the event location."
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true
     },

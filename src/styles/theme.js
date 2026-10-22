@@ -1,4 +1,3 @@
-
 export const theme = {
   colors: {
     primary: '#203A6F',

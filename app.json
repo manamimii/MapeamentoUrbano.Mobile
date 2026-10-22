@@ -5,7 +5,8 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",    "plugins": [
+    "userInterfaceStyle": "light",
+    "plugins": [
       [
         "expo-image-picker",
         {
@@ -18,7 +19,8 @@
         {
           "locationWhenInUsePermission": "Allow Event Reporter to capture the event location."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "ios": {
       "supportsTablet": true

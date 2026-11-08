@@ -97,19 +97,17 @@ export default function EventScreen() {
 
   const submitEvent = async () => {
     if (!photo || !coordinates || !description.trim()) {
-      Alert.alert(
-        'Missing information',
-        'Photo, GPS location and description are required.'
-      );
+      setErrors({
+        general: 'Preencha todos os campos obrigatórios.',
+      });
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await apiRequest('/Event/Create', {
+      await apiRequest('/Event/Create', {
         method: 'POST',
-        authenticated: true,
         body: {
           photo: photo.base64,
           latitude: coordinates.latitude,
@@ -118,13 +116,17 @@ export default function EventScreen() {
         },
       });
 
-      Alert.alert('Success', 'Event submitted successfully.');
-
       setPhoto(null);
       setCoordinates(null);
       setDescription('');
+
+      console.log('Evento enviado com sucesso.');
     } catch (error) {
-      Alert.alert('Submission failed', error.message);
+      console.log('EVENT CREATE FAILED:', error.message);
+
+      setErrors({
+        general: error.message,
+      });
     } finally {
       setLoading(false);
     }

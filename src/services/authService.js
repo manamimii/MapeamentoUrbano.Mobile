@@ -1,63 +1,92 @@
-import * as SecureStore from 'expo-secure-store';
+
+import { jwtDecode } from 'jwt-decode';
+
 import {
   apiRequest,
   AUTH_ENDPOINTS,
 } from './api';
 
-export const authService = {
-  
-async login(email, password) {
-  const response = await apiRequest(
-    AUTH_ENDPOINTS.login,
-    {
-      method: 'POST',
-      body: {
-        email,
-        password,
-      },
-    }
-  );
+import { tokenService } from './tokenService';
 
-  // Your API returns the JWT directly in entity.
-  const token =
-    typeof response?.entity === 'string'
-      ? response.entity
-      : response?.entity?.token ?? response?.token;
+export function getTokenData(token) {
+  try {
+    const decoded = jwtDecode(token);
 
-  if (typeof token !== 'string' || !token.trim()) {
-    throw new Error(
-      'Login response did not contain an authentication token.'
-    );
+    const firstAccess =
+      String(decoded.FirstAccess ?? '').toLowerCase() === 'true';
+
+    return {
+      id: decoded.Id,
+      userName: decoded.UserName,
+      role: decoded.role,
+      firstAccess,
+    };
+  } catch {
+    throw new Error('Token de autenticação inválido.');
   }
+}
 
-  // Store JWT securely on the device.
-  await SecureStore.setItemAsync('authToken', token);
+export const authService = {
+  async login(email, password) {
+    const response = await apiRequest(
+      AUTH_ENDPOINTS.login,
+      {
+        method: 'POST',
+        public: true,
+        body: {
+          email: email.trim(),
+          password,
+        },
+      }
+    );
 
-  console.log('LOGIN SUCCESSFUL');
+    // JWT is returned directly in ResponseDTO.Entity.
+    const token = response?.entity;
 
-  return {
-    token,
-    user: { email },
-  };
-},
+    if (typeof token !== 'string' || !token.trim()) {
+      throw new Error(
+        'A API não retornou um token de autenticação.'
+      );
+    }
 
+    const user = getTokenData(token);
+
+    await tokenService.save(token);
+
+    return {
+      token,
+      user,
+    };
+  },
 
   async register(name, email, password) {
     return apiRequest(AUTH_ENDPOINTS.register, {
       method: 'POST',
+      public: true,
       body: {
-        userName: name,
-        userEmail: email,
+        userName: name.trim(),
+        userEmail: email.trim(),
         userPassword: password,
       },
     });
   },
 
   async getToken() {
-    return SecureStore.getItemAsync('authToken');
+    return tokenService.get();
+  },
+
+  async updateToken(newToken) {
+    const user = getTokenData(newToken);
+
+    await tokenService.save(newToken);
+
+    return {
+      token: newToken,
+      user,
+    };
   },
 
   async logout() {
-    await SecureStore.deleteItemAsync('authToken');
+    await tokenService.remove();
   },
 };

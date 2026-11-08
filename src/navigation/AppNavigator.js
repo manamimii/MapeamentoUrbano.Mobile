@@ -1,51 +1,71 @@
-import React from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { NavigationContainer } from '@react-navigation/native';
+import React from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import LoginScreen from '../screens/LoginScreen';
-import RegisterScreen from '../screens/RegisterScreen';
-import EventScreen from '../screens/EventScreen';
-
-import { useAuth } from '../contexts/AuthContext';
+import LoginScreen from "./src/screens/LoginScreen";
+import HomeScreen from "./src/screens/HomeScreen";
+import AddressScreen from "./src/screens/AddressScreen";
+import CameraScreen from "./src/screens/CameraScreen";
 
 const Stack = createNativeStackNavigator();
 
-export default function AppNavigator() {
-  const { isAuthenticated, initializing } = useAuth();
-
-  if (initializing) {
-    return (
-      <View style={{
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-      }}>
-        <ActivityIndicator size="large" color="#203A6F" />
-      </View>
-    );
-  }
-
+export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {isAuthenticated ? (
-          <Stack.Screen
-            name="Event"
-            component={EventScreen}
-          />
-        ) : (
-          <>
-            <Stack.Screen
-              name="Login"
-              component={LoginScreen}
-            />
-            <Stack.Screen
-              name="Register"
-              component={RegisterScreen}
-            />
-          </>
-        )}
+      <Stack.Navigator
+        initialRouteName="Login"
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: "#203A6F",
+          },
+          headerTintColor: "#FFFFFF",
+          headerTitleStyle: {
+            fontWeight: "bold",
+          },
+          headerBackTitle: "Voltar",
+          animation: "slide_from_right",
+          contentStyle: {
+            backgroundColor: "#FFFFFF",
+          },
+        }}
+      >
+        {/* LOGIN */}
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
+
+        {/* HOME */}
+        <Stack.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{
+            title: "Mapeamento Urbano",
+            headerBackVisible: false,
+            gestureEnabled: false,
+          }}
+        />
+
+        {/* CADASTRO DE ENDEREÇO */}
+        <Stack.Screen
+          name="Address"
+          component={AddressScreen}
+          options={{
+            title: "Cadastrar endereço",
+          }}
+        />
+
+        {/* CÂMERA / ENVIO DE FOTOGRAFIA */}
+        <Stack.Screen
+          name="Camera"
+          component={CameraScreen}
+          options={{
+            title: "Registrar ocorrência",
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

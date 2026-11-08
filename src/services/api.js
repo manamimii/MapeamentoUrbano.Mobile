@@ -1,19 +1,24 @@
-import * as SecureStore from 'expo-secure-store';
+
+import { tokenService } from './tokenService';
 
 export const API_BASE_URL =
-  'https://api-lovat-tau-30.vercel.app//api';
+  'https://api-lovat-tau-30.vercel.app/api';
 
-// Replace these paths with your actual API routes.
 export const AUTH_ENDPOINTS = {
   login: '/Login/login',
   register: '/User/Create',
 };
 
-
 export async function apiRequest(
   endpoint,
-  { method = 'GET', body, authenticated = false } = {}
+  {
+    method = 'GET',
+    body,
+    public: isPublic = false,
+  } = {}
 ) {
+  const url = `${API_BASE_URL}${endpoint}`;
+
   const headers = {
     Accept: 'application/json',
   };
@@ -22,27 +27,29 @@ export async function apiRequest(
     headers['Content-Type'] = 'application/json';
   }
 
-  if (authenticated) {
-    const token = await SecureStore.getItemAsync('authToken');
+  // Automatically attach JWT to protected requests.
+  if (!isPublic) {
+    const token = await tokenService.get();
 
     if (!token) {
-      throw new Error('You must be logged in.');
+      throw new Error(
+        'Sessão não encontrada. Faça login novamente.'
+      );
     }
 
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const url = `${API_BASE_URL}${endpoint}`;
-
   try {
-    console.log('API REQUEST:', method, url);
+    console.log('API REQUEST:', method, endpoint);
 
     const response = await fetch(url, {
       method,
       headers,
-      body: body === undefined
-        ? undefined
-        : JSON.stringify(body),
+      body:
+        body === undefined
+          ? undefined
+          : JSON.stringify(body),
     });
 
     const raw = await response.text();
@@ -55,33 +62,33 @@ export async function apiRequest(
       data = raw;
     }
 
-    console.log('API STATUS:', response.status);
-    console.log('API RESPONSE:', data);
+    const statusCode =
+      typeof data?.statusCode === 'number'
+        ? data.statusCode
+        : response.status;
 
     const hasError =
-      !response.ok ||
-      (typeof data?.statusCode === 'number' &&
-        data.statusCode >= 400) ||
-      (typeof data?.status === 'number' &&
-        data.status >= 400);
+      !response.ok || statusCode >= 400;
 
     if (hasError) {
       const errors = [];
 
-      // ASP.NET Core ModelState validation
+      // ASP.NET Core validation errors.
       if (data?.errors && typeof data.errors === 'object') {
-        Object.entries(data.errors).forEach(([field, messages]) => {
-          const values = Array.isArray(messages)
-            ? messages
-            : [messages];
+        Object.entries(data.errors).forEach(
+          ([field, messages]) => {
+            const values = Array.isArray(messages)
+              ? messages
+              : [messages];
 
-          values.forEach(message => {
-            errors.push(`${field}: ${message}`);
-          });
-        });
+            values.forEach(message => {
+              errors.push(`${field}: ${message}`);
+            });
+          }
+        );
       }
 
-      // Custom ResponseDTO validation
+      // Custom ResponseDTO validation errors.
       if (Array.isArray(data?.validationErrors)) {
         errors.push(...data.validationErrors);
       }
@@ -93,18 +100,28 @@ export async function apiRequest(
             data?.title ||
             `HTTP ${response.status}`;
 
-      // Log without triggering Expo's error overlay
-      console.log('API STATUS:', response.status);
-      console.log('API VALIDATION ERRORS:', message);
+      console.log('API ERROR:', {
+        endpoint,
+        statusCode,
+        message,
+      });
 
       throw new Error(message);
     }
 
+    console.log('API SUCCESS:', {
+      endpoint,
+      statusCode,
+    });
+
     return data;
 
   } catch (error) {
-    console.log('API REQUEST FAILED:', error.message);
+    console.log('API REQUEST FAILED:', {
+      endpoint,
+      message: error.message,
+    });
+
     throw error;
   }
 }
-

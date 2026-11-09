@@ -1,5 +1,6 @@
 
-import React, { useState } from "react";
+import React, { useState } from 'react';
+
 import {
   View,
   Text,
@@ -10,37 +11,36 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
-} from "react-native";
+} from 'react-native';
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// Substitua pela URL real da sua API.
-const API_URL = "https://sua-api.com/api";
+import { addressService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function AddressScreen({ navigation }) {
-  const [cep, setCep] = useState("");
-  const [street, setStreet] = useState("");
-  const [number, setNumber] = useState("");
-  const [complement, setComplement] = useState("");
-  const [neighborhood, setNeighborhood] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
+  const { completeFirstAccess } = useAuth();
+
+  const [cep, setCep] = useState('');
+  const [street, setStreet] = useState('');
+  const [number, setNumber] = useState('');
+  const [neighborhood, setNeighborhood] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
 
   const [loadingCep, setLoadingCep] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const formatCep = (value) => {
-    const digits = value.replace(/\D/g, "").slice(0, 8);
+    const digits = value.replace(/\D/g, '').slice(0, 8);
 
     if (digits.length > 5) {
-      return digits.slice(0, 5) + "-" + digits.slice(5);
+      return digits.slice(0, 5) + '-' + digits.slice(5);
     }
 
     return digits;
   };
 
   const searchCep = async (value) => {
-    const cleanCep = value.replace(/\D/g, "");
+    const cleanCep = value.replace(/\D/g, '');
 
     if (cleanCep.length !== 8) return;
 
@@ -48,29 +48,39 @@ export default function AddressScreen({ navigation }) {
     Keyboard.dismiss();
 
     try {
+      console.log('CEP REQUEST:', cleanCep);
+
       const response = await fetch(
         `https://viacep.com.br/ws/${cleanCep}/json/`
       );
 
       if (!response.ok) {
-        throw new Error("Erro ao consultar CEP.");
+        throw new Error('Erro ao consultar CEP.');
       }
 
       const data = await response.json();
 
       if (data.erro) {
-        Alert.alert("CEP não encontrado", "Verifique o CEP informado.");
+        Alert.alert(
+          'CEP não encontrado',
+          'Verifique o CEP informado.'
+        );
         return;
       }
 
-      setStreet(data.logradouro || "");
-      setNeighborhood(data.bairro || "");
-      setCity(data.localidade || "");
-      setState(data.uf || "");
-      setComplement("");
+      setStreet(data.logradouro || '');
+      setNeighborhood(data.bairro || '');
+      setCity(data.localidade || '');
+      setState(data.uf || '');
 
+      console.log('CEP SUCCESS:', cleanCep);
     } catch (error) {
-      Alert.alert("Erro", "Não foi possível consultar o CEP.");
+      console.log('CEP ERROR:', error.message);
+
+      Alert.alert(
+        'Erro',
+        'Não foi possível consultar o CEP.'
+      );
     } finally {
       setLoadingCep(false);
     }
@@ -78,15 +88,14 @@ export default function AddressScreen({ navigation }) {
 
   const handleCepChange = (value) => {
     const formatted = formatCep(value);
-    const digits = formatted.replace(/\D/g, "");
+    const digits = formatted.replace(/\D/g, '');
 
     setCep(formatted);
 
-    // Limpa o endereço anterior ao alterar o CEP.
-    setStreet("");
-    setNeighborhood("");
-    setCity("");
-    setState("");
+    setStreet('');
+    setNeighborhood('');
+    setCity('');
+    setState('');
 
     if (digits.length === 8) {
       searchCep(digits);
@@ -95,7 +104,7 @@ export default function AddressScreen({ navigation }) {
 
   const handleSave = async () => {
     if (
-      cep.replace(/\D/g, "").length !== 8 ||
+      cep.replace(/\D/g, '').length !== 8 ||
       !street.trim() ||
       !number.trim() ||
       !neighborhood.trim() ||
@@ -103,68 +112,63 @@ export default function AddressScreen({ navigation }) {
       !state.trim()
     ) {
       Alert.alert(
-        "Campos obrigatórios",
-        "Preencha todos os campos obrigatórios."
+        'Campos obrigatórios',
+        'Preencha todos os campos obrigatórios.'
       );
       return;
     }
 
+    if (saving || loadingCep) return;
+
     setSaving(true);
 
     try {
-      // Ajuste a chave caso seu login utilize outro nome.
-      const token = await AsyncStorage.getItem("token");
-
-      if (!token) {
-        Alert.alert("Sessão expirada", "Faça login novamente.");
-        return;
-      }
-
       const payload = {
-        cep: cep.replace(/\D/g, ""),
+        zipCode: cep.replace(/\D/g, ''),
         street: street.trim(),
         number: number.trim(),
-        complement: complement.trim(),
         neighborhood: neighborhood.trim(),
         city: city.trim(),
-        state: state.trim(),
+        state: state.trim().toUpperCase(),
       };
 
-      const response = await fetch(
-        `${API_URL}/Address/Create`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      console.log('ADDRESS CREATE START');
 
-      const data = await response.json();
+      const result = await addressService.create(payload);
 
-      if (!response.ok || data.statusCode >= 400) {
-        throw new Error(
-          data.message ||
-          data.validationErrors?.join("\n") ||
-          "Erro ao cadastrar endereço."
-        );
-      }
+      console.log('ADDRESS CREATE SUCCESS:', result);
 
       Alert.alert(
-        "Sucesso",
-        "Endereço cadastrado com sucesso!",
+        'Sucesso',
+        'Endereço cadastrado com sucesso!',
         [
           {
-            text: "OK",
-            onPress: () => navigation.goBack(),
+            text: 'OK',
+            onPress: async () => {
+              try {
+                await completeFirstAccess();
+              } catch (error) {
+                console.log(
+                  'COMPLETE FIRST ACCESS ERROR:',
+                  error.message
+                );
+
+                Alert.alert(
+                  'Erro',
+                  'Endereço salvo, mas não foi possível atualizar a sessão.'
+                );
+              }
+            },
           },
         ]
       );
-
     } catch (error) {
-      Alert.alert("Erro", error.message);
+      console.log('ADDRESS CREATE ERROR:', error.message);
+
+      Alert.alert(
+        'Erro ao cadastrar endereço',
+        error.message || 'Erro desconhecido.'
+      );
     } finally {
       setSaving(false);
     }
@@ -178,12 +182,13 @@ export default function AddressScreen({ navigation }) {
   ) => (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
+
       <TextInput
         style={styles.input}
         value={value}
         onChangeText={onChangeText}
         placeholder={options.placeholder || label}
-        keyboardType={options.keyboardType || "default"}
+        keyboardType={options.keyboardType || 'default'}
         autoCapitalize="words"
         editable={!saving && !options.disabled}
       />
@@ -196,7 +201,10 @@ export default function AddressScreen({ navigation }) {
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={styles.title}>Meu endereço</Text>
+      <Text style={styles.title}>
+        Meu endereço
+      </Text>
+
       <Text style={styles.subtitle}>
         Informe seu endereço residencial.
       </Text>
@@ -221,42 +229,34 @@ export default function AddressScreen({ navigation }) {
         </View>
       </View>
 
-      {renderInput("Rua", street, setStreet)}
+      {renderInput('Rua', street, setStreet)}
 
       <View style={styles.row}>
         <View style={styles.half}>
-          {renderInput("Número", number, setNumber)}
-        </View>
-
-        <View style={styles.half}>
-          {renderInput(
-            "Complemento",
-            complement,
-            setComplement
-          )}
+          {renderInput('Número', number, setNumber)}
         </View>
       </View>
 
       {renderInput(
-        "Bairro",
+        'Bairro',
         neighborhood,
         setNeighborhood
       )}
 
       <View style={styles.row}>
         <View style={styles.city}>
-          {renderInput("Cidade", city, setCity)}
+          {renderInput('Cidade', city, setCity)}
         </View>
 
         <View style={styles.uf}>
-          {renderInput("UF", state, setState)}
+          {renderInput('UF', state, setState)}
         </View>
       </View>
 
       <TouchableOpacity
         style={[
           styles.button,
-          (saving || loadingCep) && styles.buttonDisabled
+          (saving || loadingCep) && styles.buttonDisabled,
         ]}
         onPress={handleSave}
         disabled={saving || loadingCep}
@@ -276,7 +276,7 @@ export default function AddressScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: '#FFFFFF',
   },
   content: {
     padding: 24,
@@ -284,13 +284,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 26,
-    fontWeight: "bold",
-    color: "#203A6F",
+    fontWeight: 'bold',
+    color: '#203A6F',
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 14,
-    color: "#64748B",
+    color: '#64748B',
     marginBottom: 28,
   },
   field: {
@@ -298,30 +298,30 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#334155",
+    fontWeight: '600',
+    color: '#334155',
     marginBottom: 8,
   },
   input: {
     height: 50,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
+    borderColor: '#CBD5E1',
     borderRadius: 10,
     paddingHorizontal: 14,
-    backgroundColor: "#FFFFFF",
-    color: "#0F172A",
+    backgroundColor: '#FFFFFF',
+    color: '#0F172A',
     fontSize: 15,
   },
   cepContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
   cepInput: {
     flex: 1,
   },
   row: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 12,
   },
   half: {
@@ -335,18 +335,18 @@ const styles = StyleSheet.create({
   },
   button: {
     height: 52,
-    backgroundColor: "#203A6F",
+    backgroundColor: '#203A6F',
     borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 20,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: "#FFFFFF",
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: 'bold',
   },
 });

@@ -16,12 +16,9 @@ import * as Location from 'expo-location';
 import AppButton from '../components/AppButton';
 import AppInput from '../components/AppInput';
 import { apiRequest } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../styles/theme';
 
 export default function EventScreen() {
-  const { logout } = useAuth();
-
   const [photo, setPhoto] = useState(null);
   const [coordinates, setCoordinates] = useState(null);
   const [description, setDescription] = useState('');
@@ -142,10 +139,6 @@ export default function EventScreen() {
               Capture and submit a report
             </Text>
           </View>
-
-          <TouchableOpacity onPress={logout}>
-            <Text style={styles.logout}>Logout</Text>
-          </TouchableOpacity>
         </View>
 
         <TouchableOpacity

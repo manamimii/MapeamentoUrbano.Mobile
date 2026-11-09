@@ -1,12 +1,14 @@
 
 import { tokenService } from './tokenService';
-
-export const API_BASE_URL =
-  'https://api-lovat-tau-30.vercel.app/api';
+import { api } from './apiUrl';
 
 export const AUTH_ENDPOINTS = {
   login: '/Login/login',
   register: '/User/Create',
+};
+
+export const ADDRESS_ENDPOINTS = {
+  create: '/Address/Create',
 };
 
 export async function apiRequest(
@@ -17,7 +19,7 @@ export async function apiRequest(
     public: isPublic = false,
   } = {}
 ) {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = `${api}${endpoint}`;
 
   const headers = {
     Accept: 'application/json',
@@ -27,11 +29,15 @@ export async function apiRequest(
     headers['Content-Type'] = 'application/json';
   }
 
-  // Automatically attach JWT to protected requests.
   if (!isPublic) {
     const token = await tokenService.get();
 
     if (!token) {
+      console.log('API AUTH ERROR:', {
+        endpoint,
+        message: 'Token não encontrado',
+      });
+
       throw new Error(
         'Sessão não encontrada. Faça login novamente.'
       );
@@ -42,6 +48,7 @@ export async function apiRequest(
 
   try {
     console.log('API REQUEST:', method, endpoint);
+    console.log('API URL:', url);
 
     const response = await fetch(url, {
       method,
@@ -67,28 +74,38 @@ export async function apiRequest(
         ? data.statusCode
         : response.status;
 
+    console.log('API RESPONSE:', {
+      endpoint,
+      httpStatus: response.status,
+      statusCode,
+      data,
+    });
+
     const hasError =
-      !response.ok || statusCode >= 400;
+      !response.ok ||
+      statusCode >= 400 ||
+      data?.success === false;
 
     if (hasError) {
       const errors = [];
 
-      // ASP.NET Core validation errors.
-      if (data?.errors && typeof data.errors === 'object') {
+      if (
+        data?.errors &&
+        typeof data.errors === 'object'
+      ) {
         Object.entries(data.errors).forEach(
           ([field, messages]) => {
             const values = Array.isArray(messages)
               ? messages
               : [messages];
 
-            values.forEach(message => {
+            values.forEach((message) => {
               errors.push(`${field}: ${message}`);
             });
           }
         );
       }
 
-      // Custom ResponseDTO validation errors.
       if (Array.isArray(data?.validationErrors)) {
         errors.push(...data.validationErrors);
       }
@@ -98,6 +115,7 @@ export async function apiRequest(
           ? errors.join('\n')
           : data?.message ||
             data?.title ||
+            (typeof data === 'string' ? data : null) ||
             `HTTP ${response.status}`;
 
       console.log('API ERROR:', {
@@ -115,7 +133,6 @@ export async function apiRequest(
     });
 
     return data;
-
   } catch (error) {
     console.log('API REQUEST FAILED:', {
       endpoint,
@@ -125,3 +142,12 @@ export async function apiRequest(
     throw error;
   }
 }
+
+export const addressService = {
+  create: async (address) => {
+    return apiRequest(ADDRESS_ENDPOINTS.create, {
+      method: 'POST',
+      body: address,
+    });
+  },
+};

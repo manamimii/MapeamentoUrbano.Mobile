@@ -1,72 +1,99 @@
-import React from "react";
-import { NavigationContainer } from "@react-navigation/native";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import React from 'react';
 
-import LoginScreen from "./src/screens/LoginScreen";
-import HomeScreen from "./src/screens/HomeScreen";
-import AddressScreen from "./src/screens/AddressScreen";
-import CameraScreen from "./src/screens/CameraScreen";
+import {
+  View,
+  ActivityIndicator,
+} from 'react-native';
+
+import {
+  createNativeStackNavigator,
+} from '@react-navigation/native-stack';
+
+import { useAuth } from '../contexts/AuthContext';
+
+import LoginScreen from '../screens/LoginScreen';
+import RegisterScreen from '../screens/RegisterScreen';
+import AddressScreen from '../screens/AddressScreen';
+import DrawerNavigator from './DrawerNavigator';
 
 const Stack = createNativeStackNavigator();
 
-export default function App() {
-  return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Login"
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: "#203A6F",
-          },
-          headerTintColor: "#FFFFFF",
-          headerTitleStyle: {
-            fontWeight: "bold",
-          },
-          headerBackTitle: "Voltar",
-          animation: "slide_from_right",
-          contentStyle: {
-            backgroundColor: "#FFFFFF",
-          },
+export default function AppNavigator() {
+  const {
+    isAuthenticated,
+    firstAccess,
+    initializing,
+  } = useAuth();
+
+  if (initializing) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
         }}
       >
-        {/* LOGIN */}
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{
-            headerShown: false,
-          }}
+        <ActivityIndicator
+          size="large"
+          color="#203A6F"
         />
+      </View>
+    );
+  }
 
-        {/* HOME */}
-        <Stack.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{
-            title: "Mapeamento Urbano",
-            headerBackVisible: false,
-            gestureEnabled: false,
-          }}
-        />
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: '#000E35',
+        },
+        headerTintColor: '#FFFFFF',
+        animation: 'slide_from_right',
+      }}
+    >
+      {!isAuthenticated ? (
+        <Stack.Group navigationKey="guest">
+          <Stack.Screen
+            name="Login"
+            component={LoginScreen}
+            options={{
+              headerShown: false,
+            }}
+          />
 
-        {/* CADASTRO DE ENDEREÇO */}
-        <Stack.Screen
-          name="Address"
-          component={AddressScreen}
-          options={{
-            title: "Cadastrar endereço",
-          }}
-        />
-
-        {/* CÂMERA / ENVIO DE FOTOGRAFIA */}
-        <Stack.Screen
-          name="Camera"
-          component={CameraScreen}
-          options={{
-            title: "Registrar ocorrência",
-          }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+          <Stack.Screen
+            name="Register"
+            component={RegisterScreen}
+            options={{
+              title: 'Criar conta',
+            }}
+          />
+        </Stack.Group>
+      ) : firstAccess ? (
+        <Stack.Group navigationKey="firstAccess">
+          <Stack.Screen
+            name="Address"
+            component={AddressScreen}
+            options={{
+              title: 'Cadastrar endereço',
+              headerBackVisible: false,
+              gestureEnabled: false,
+            }}
+          />
+        </Stack.Group>
+      ) : (
+        <Stack.Group navigationKey="authenticated">
+          <Stack.Screen
+            name="Main"
+            component={DrawerNavigator}
+            options={{
+              headerShown: false,
+              gestureEnabled: false,
+            }}
+          />
+        </Stack.Group>
+      )}
+    </Stack.Navigator>
   );
 }

@@ -1,4 +1,3 @@
-
 import React, {
   createContext,
   useContext,
@@ -19,29 +18,26 @@ export function AuthProvider({ children }) {
   const [firstAccess, setFirstAccess] = useState(false);
   const [initializing, setInitializing] = useState(true);
 
+  // Sempre iniciar o aplicativo deslogado
   useEffect(() => {
-    const restoreSession = async () => {
+    const initialize = async () => {
       try {
-        const savedToken = await authService.getToken();
-
-        if (savedToken) {
-          const decoded = getTokenData(savedToken);
-
-          setToken(savedToken);
-          setUser(decoded);
-          setFirstAccess(decoded.firstAccess);
-        }
-      } catch (error) {
-        console.log('Session restore failed:', error.message);
+        // Remove qualquer sessão salva anteriormente
         await authService.logout();
+      } catch (error) {
+        console.log('Session initialization failed:', error.message);
       } finally {
+        setUser(null);
+        setToken(null);
+        setFirstAccess(false);
         setInitializing(false);
       }
     };
 
-    restoreSession();
+    initialize();
   }, []);
 
+  // Login
   const login = async (email, password) => {
     const result = await authService.login(email, password);
 
@@ -50,6 +46,7 @@ export function AuthProvider({ children }) {
     setFirstAccess(result.user.firstAccess);
   };
 
+  // Finalizar primeiro acesso após cadastrar endereço
   const completeFirstAccess = () => {
     setFirstAccess(false);
 
@@ -58,6 +55,7 @@ export function AuthProvider({ children }) {
     );
   };
 
+  // Logout
   const logout = async () => {
     await authService.logout();
 
@@ -66,6 +64,7 @@ export function AuthProvider({ children }) {
     setFirstAccess(false);
   };
 
+  // Atualizar token
   const updateSession = async (newToken) => {
     const result = await authService.updateToken(newToken);
 

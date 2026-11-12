@@ -318,6 +318,29 @@ export default function ProfileScreen({ navigation }) {
           </>
         )}
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[
+          styles.button,
+          {
+            backgroundColor: '#FFFFFF',
+            borderWidth: 1,
+            borderColor: '#203A6F',
+          },
+          (hasChanges || saving) && styles.disabledButton,
+        ]}
+        onPress={() => navigation.navigate('AddressEdit')}
+        disabled={hasChanges || saving}
+      >
+        <Text
+          style={[
+            styles.buttonText,
+            { color: '#203A6F' },
+          ]}
+        >
+          Editar endereço
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }

@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import EventScreen from '../screens/EventScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EventListScreen from '../screens/EventListScreen';
+import AddressScreen from '../screens/AddressScreen';
+import AwardScreen from '../screens/AwardScreen';
 
 import { useAuth } from '../contexts/AuthContext';
 
@@ -43,12 +45,14 @@ export default function DrawerNavigator() {
   };
   
   const hasPendingChanges = (navigationState) => {
-    const profileRoute = navigationState.routes.find(
-        route => route.name === 'Profile'
-    );
+    const activeRoute =
+      navigationState.routes[navigationState.index];
 
-    return profileRoute?.params?.hasUnsavedChanges === true;
-    };
+    return (
+      ['Profile', 'AddressEdit'].includes(activeRoute?.name) &&
+      activeRoute?.params?.hasUnsavedChanges === true
+    );
+  };
 
     const handleProtectedNavigation = (routeName, props) => {
     if (hasPendingChanges(props.state)) {
@@ -132,18 +136,22 @@ export default function DrawerNavigator() {
                 const focused = props.state.index === index;
 
                 const menuItems = {
-                    Event: {
+                  Event: {
                     label: 'Cadastrar evento',
                     icon: 'camera-outline',
-                    },
-                    EventList: {
+                  },
+                  EventList: {
                     label: 'Meus eventos',
                     icon: 'images-outline',
-                    },
-                    Profile: {
+                  },
+                  Awards: {
+                    label: 'Minhas medalhas',
+                    icon: 'trophy-outline',
+                  },
+                  Profile: {
                     label: 'Meu perfil',
                     icon: 'person-outline',
-                    },
+                  },
                 };
 
                 const item = menuItems[route.name];
@@ -199,10 +207,29 @@ export default function DrawerNavigator() {
       />
 
       <Drawer.Screen
+        name="Awards"
+        component={AwardScreen}
+        options={{
+          title: 'Minhas medalhas',
+        }}
+      />
+
+      <Drawer.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
           title: 'Meu perfil',
+        }}
+      />
+
+      <Drawer.Screen
+        name="AddressEdit"
+        component={AddressScreen}
+        initialParams={{ mode: 'edit' }}
+        options={{
+          title: 'Editar endereço',
+          drawerItemStyle: { display: 'none' },
+          swipeEnabled: false,
         }}
       />
     </Drawer.Navigator>

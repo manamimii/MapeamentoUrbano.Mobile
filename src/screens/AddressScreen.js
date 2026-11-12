@@ -1,5 +1,8 @@
-
-import React, { useState } from 'react';
+import React, {
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   View,
@@ -13,30 +16,141 @@ import {
   Keyboard,
 } from 'react-native';
 
-import { addressService } from '../services/api';
+import {
+  usePreventRemove,
+} from '@react-navigation/native';
+
+import { addressService } from '../services/addressService';
 import { useAuth } from '../contexts/AuthContext';
 
-export default function AddressScreen({ navigation }) {
+const emptyAddress = {
+  id: null,
+  zipCode: '',
+  street: '',
+  number: '',
+  neighborhood: '',
+  city: '',
+  state: '',
+};
+
+const normalizeAddress = (data) => ({
+  id: data?.id ?? data?.Id ?? null,
+  zipCode: String(data?.zipCode ?? '').replace(/\D/g, ''),
+  street: data?.street ?? '',
+  number: String(data?.number ?? ''),
+  neighborhood: data?.neighborhood ?? '',
+  city: data?.city ?? '',
+  state: data?.state ?? '',
+});
+
+const formatCep = (value) => {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+
+  if (digits.length > 5) {
+    return digits.slice(0, 5) + '-' + digits.slice(5);
+  }
+
+  return digits;
+};
+
+const hasAddressChanged = (original, current) => {
+  if (!original || !current) return false;
+
+  return [
+    'zipCode',
+    'street',
+    'number',
+    'neighborhood',
+    'city',
+    'state',
+  ].some(field => original[field] !== current[field]);
+};
+
+export default function AddressScreen({ navigation, route }) {
   const { completeFirstAccess } = useAuth();
 
-  const [cep, setCep] = useState('');
-  const [street, setStreet] = useState('');
-  const [number, setNumber] = useState('');
-  const [neighborhood, setNeighborhood] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
+  const isEdit = route?.params?.mode === 'edit';
 
+  const [address, setAddress] = useState(emptyAddress);
+  const [original, setOriginal] = useState(null);
+
+  const [loading, setLoading] = useState(isEdit);
   const [loadingCep, setLoadingCep] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const formatCep = (value) => {
-    const digits = value.replace(/\D/g, '').slice(0, 8);
+  const cepRequestRef = useRef(0);
+  const savingRef = useRef(false);
 
-    if (digits.length > 5) {
-      return digits.slice(0, 5) + '-' + digits.slice(5);
+  const hasChanges =
+    isEdit && hasAddressChanged(original, address);
+
+  const isBusy = saving || loadingCep;
+
+  useEffect(() => {
+    if (!isEdit) return;
+
+    let active = true;
+
+    const loadAddress = async () => {
+      setLoading(true);
+
+      try {
+        const data = await addressService.getProfileAddress();
+
+        if (!active) return;
+
+        const normalized = normalizeAddress(data);
+
+        if (!normalized.id) {
+          throw new Error('Id do endereço não encontrado.');
+        }
+
+        setAddress(normalized);
+        setOriginal(normalized);
+      } catch (error) {
+        if (active) {
+          Alert.alert(
+            'Erro',
+            error.message || 'Não foi possível carregar o endereço.'
+          );
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    loadAddress();
+
+    return () => {
+      active = false;
+      cepRequestRef.current += 1;
+    };
+  }, [isEdit]);
+
+  useEffect(() => {
+    if (!isEdit) return;
+
+    navigation.setParams({
+      hasUnsavedChanges: hasChanges || isBusy,
+    });
+  }, [navigation, isEdit, hasChanges, isBusy]);
+
+  usePreventRemove(
+    isEdit && (hasChanges || isBusy),
+    () => {
+      Alert.alert(
+        'Alterações não salvas',
+        'Você precisa salvar as alterações antes de sair desta tela.',
+        [{ text: 'Continuar editando' }]
+      );
     }
+  );
 
-    return digits;
+  const updateField = (field, value) => {
+    setAddress(prev => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   const searchCep = async (value) => {
@@ -44,12 +158,12 @@ export default function AddressScreen({ navigation }) {
 
     if (cleanCep.length !== 8) return;
 
+    const requestId = ++cepRequestRef.current;
+
     setLoadingCep(true);
     Keyboard.dismiss();
 
     try {
-      console.log('CEP REQUEST:', cleanCep);
-
       const response = await fetch(
         `https://viacep.com.br/ws/${cleanCep}/json/`
       );
@@ -60,6 +174,8 @@ export default function AddressScreen({ navigation }) {
 
       const data = await response.json();
 
+      if (requestId !== cepRequestRef.current) return;
+
       if (data.erro) {
         Alert.alert(
           'CEP não encontrado',
@@ -68,34 +184,41 @@ export default function AddressScreen({ navigation }) {
         return;
       }
 
-      setStreet(data.logradouro || '');
-      setNeighborhood(data.bairro || '');
-      setCity(data.localidade || '');
-      setState(data.uf || '');
-
-      console.log('CEP SUCCESS:', cleanCep);
+      setAddress(prev => ({
+        ...prev,
+        street: data.logradouro || '',
+        neighborhood: data.bairro || '',
+        city: data.localidade || '',
+        state: data.uf || '',
+      }));
     } catch (error) {
-      console.log('CEP ERROR:', error.message);
-
-      Alert.alert(
-        'Erro',
-        'Não foi possível consultar o CEP.'
-      );
+      if (requestId === cepRequestRef.current) {
+        Alert.alert(
+          'Erro',
+          'Não foi possível consultar o CEP.'
+        );
+      }
     } finally {
-      setLoadingCep(false);
+      if (requestId === cepRequestRef.current) {
+        setLoadingCep(false);
+      }
     }
   };
 
   const handleCepChange = (value) => {
-    const formatted = formatCep(value);
-    const digits = formatted.replace(/\D/g, '');
+    const digits = value.replace(/\D/g, '').slice(0, 8);
 
-    setCep(formatted);
+    cepRequestRef.current += 1;
+    setLoadingCep(false);
 
-    setStreet('');
-    setNeighborhood('');
-    setCity('');
-    setState('');
+    setAddress(prev => ({
+      ...prev,
+      zipCode: digits,
+      street: '',
+      neighborhood: '',
+      city: '',
+      state: '',
+    }));
 
     if (digits.length === 8) {
       searchCep(digits);
@@ -103,13 +226,15 @@ export default function AddressScreen({ navigation }) {
   };
 
   const handleSave = async () => {
+    if (savingRef.current || loadingCep || loading) return;
+
     if (
-      cep.replace(/\D/g, '').length !== 8 ||
-      !street.trim() ||
-      !number.trim() ||
-      !neighborhood.trim() ||
-      !city.trim() ||
-      !state.trim()
+      address.zipCode.length !== 8 ||
+      !address.street.trim() ||
+      !address.number.trim() ||
+      !address.neighborhood.trim() ||
+      !address.city.trim() ||
+      !address.state.trim()
     ) {
       Alert.alert(
         'Campos obrigatórios',
@@ -118,66 +243,75 @@ export default function AddressScreen({ navigation }) {
       return;
     }
 
-    if (saving || loadingCep) return;
+    if (isEdit && !address.id) {
+      Alert.alert('Erro', 'Id do endereço não encontrado.');
+      return;
+    }
 
+    savingRef.current = true;
     setSaving(true);
 
     try {
       const payload = {
-        zipCode: cep.replace(/\D/g, ''),
-        street: street.trim(),
-        number: number.trim(),
-        neighborhood: neighborhood.trim(),
-        city: city.trim(),
-        state: state.trim().toUpperCase(),
+        ...address,
+        street: address.street.trim(),
+        number: address.number.trim(),
+        neighborhood: address.neighborhood.trim(),
+        city: address.city.trim(),
+        state: address.state.trim().toUpperCase(),
       };
 
-      console.log('ADDRESS CREATE START');
+      if (isEdit) {
+        await addressService.update(payload);
 
-      const result = await addressService.create(payload);
+        // Reconsulta os dados persistidos.
+        const updated = await addressService.getProfileAddress();
+        const normalized = normalizeAddress(updated);
 
-      console.log('ADDRESS CREATE SUCCESS:', result);
+        setAddress(normalized);
+        setOriginal(normalized);
 
-      Alert.alert(
-        'Sucesso',
-        'Endereço cadastrado com sucesso!',
-        [
-          {
-            text: 'OK',
-            onPress: async () => {
-              try {
-                await completeFirstAccess();
-              } catch (error) {
-                console.log(
-                  'COMPLETE FIRST ACCESS ERROR:',
-                  error.message
-                );
+        Alert.alert(
+          'Sucesso',
+          'Endereço atualizado com sucesso!'
+        );
+      } else {
+        await addressService.create(payload);
 
-                Alert.alert(
-                  'Erro',
-                  'Endereço salvo, mas não foi possível atualizar a sessão.'
-                );
-              }
+        Alert.alert(
+          'Sucesso',
+          'Endereço cadastrado com sucesso!',
+          [
+            {
+              text: 'OK',
+              onPress: async () => {
+                try {
+                  await completeFirstAccess();
+                } catch (error) {
+                  Alert.alert(
+                    'Erro',
+                    'Endereço salvo, mas não foi possível atualizar a sessão.'
+                  );
+                }
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+      }
     } catch (error) {
-      console.log('ADDRESS CREATE ERROR:', error.message);
-
       Alert.alert(
-        'Erro ao cadastrar endereço',
+        'Erro ao salvar endereço',
         error.message || 'Erro desconhecido.'
       );
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
 
   const renderInput = (
     label,
-    value,
-    onChangeText,
+    field,
     options = {}
   ) => (
     <View style={styles.field}>
@@ -185,15 +319,24 @@ export default function AddressScreen({ navigation }) {
 
       <TextInput
         style={styles.input}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={options.placeholder || label}
+        value={address[field]}
+        onChangeText={value => updateField(field, value)}
+        placeholder={label}
         keyboardType={options.keyboardType || 'default'}
-        autoCapitalize="words"
-        editable={!saving && !options.disabled}
+        autoCapitalize={options.autoCapitalize || 'words'}
+        editable={!isBusy}
       />
     </View>
   );
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#203A6F" />
+        <Text>Carregando endereço...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -206,8 +349,18 @@ export default function AddressScreen({ navigation }) {
       </Text>
 
       <Text style={styles.subtitle}>
-        Informe seu endereço residencial.
+        {isEdit
+          ? 'Atualize seu endereço residencial.'
+          : 'Informe seu endereço residencial.'}
       </Text>
+
+      {hasChanges && (
+        <View style={styles.warning}>
+          <Text style={styles.warningText}>
+            Você possui alterações não salvas.
+          </Text>
+        </View>
+      )}
 
       <View style={styles.field}>
         <Text style={styles.label}>CEP</Text>
@@ -215,7 +368,7 @@ export default function AddressScreen({ navigation }) {
         <View style={styles.cepContainer}>
           <TextInput
             style={[styles.input, styles.cepInput]}
-            value={cep}
+            value={formatCep(address.zipCode)}
             onChangeText={handleCepChange}
             placeholder="00000-000"
             keyboardType="numeric"
@@ -229,43 +382,51 @@ export default function AddressScreen({ navigation }) {
         </View>
       </View>
 
-      {renderInput('Rua', street, setStreet)}
+      {renderInput('Rua', 'street')}
 
       <View style={styles.row}>
         <View style={styles.half}>
-          {renderInput('Número', number, setNumber)}
+          {renderInput('Número', 'number')}
         </View>
       </View>
 
-      {renderInput(
-        'Bairro',
-        neighborhood,
-        setNeighborhood
-      )}
+      {renderInput('Bairro', 'neighborhood')}
 
       <View style={styles.row}>
         <View style={styles.city}>
-          {renderInput('Cidade', city, setCity)}
+          {renderInput('Cidade', 'city')}
         </View>
 
         <View style={styles.uf}>
-          {renderInput('UF', state, setState)}
+          {renderInput('UF', 'state', {
+            autoCapitalize: 'characters',
+          })}
         </View>
       </View>
 
       <TouchableOpacity
         style={[
           styles.button,
-          (saving || loadingCep) && styles.buttonDisabled,
+          (
+            saving ||
+            loadingCep ||
+            (isEdit && !hasChanges)
+          ) && styles.buttonDisabled,
         ]}
         onPress={handleSave}
-        disabled={saving || loadingCep}
+        disabled={
+          saving ||
+          loadingCep ||
+          (isEdit && !hasChanges)
+        }
       >
         {saving ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
           <Text style={styles.buttonText}>
-            Salvar endereço
+            {isEdit
+              ? 'Salvar alterações'
+              : 'Salvar endereço'}
           </Text>
         )}
       </TouchableOpacity>
@@ -281,6 +442,12 @@ const styles = StyleSheet.create({
   content: {
     padding: 24,
     paddingBottom: 50,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
   },
   title: {
     fontSize: 26,
@@ -333,6 +500,16 @@ const styles = StyleSheet.create({
   uf: {
     flex: 1,
   },
+  warning: {
+    backgroundColor: '#FEF3C7',
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  warningText: {
+    color: '#92400E',
+    fontSize: 13,
+  },
   button: {
     height: 52,
     backgroundColor: '#203A6F',
@@ -342,7 +519,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   buttonText: {
     color: '#FFFFFF',

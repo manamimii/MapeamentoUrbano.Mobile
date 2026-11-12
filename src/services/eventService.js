@@ -1,7 +1,11 @@
 import { apiRequest } from './api';
 
 export const eventService = {
-  async getPaginated(pageIndex = 1, pageSize = 10, sortOrder = '') {
+  async getPaginated(
+    pageIndex = 1,
+    pageSize = 10,
+    sortOrder = ''
+  ) {
     const params = new URLSearchParams({
       pageIndex: String(pageIndex),
       pageSize: String(pageSize),
@@ -18,7 +22,29 @@ export const eventService = {
       }
     );
 
-    // Compatível com resposta direta ou ResponseDTO.
     return response?.entity ?? response;
+  },
+
+  async revaluateEvent(eventId) {
+    if (!eventId) {
+      throw new Error('Id do evento não encontrado.');
+    }
+
+    const response = await apiRequest(
+      `/Event/RevaluateEvent?eventId=${encodeURIComponent(eventId)}`,
+      {
+        method: 'PUT',
+      }
+    );
+
+    if (response?.statusCode >= 400) {
+      throw new Error(
+        response.message ||
+        response.validationErrors?.join('\n') ||
+        'Não foi possível solicitar a reavaliação.'
+      );
+    }
+
+    return response;
   },
 };

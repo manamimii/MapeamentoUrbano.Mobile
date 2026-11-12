@@ -1,5 +1,6 @@
 import React, {
   useCallback,
+  useRef,
   useState,
 } from 'react';
 
@@ -12,6 +13,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 
 import { useFocusEffect } from '@react-navigation/native';
@@ -21,6 +23,62 @@ import { eventService } from '../services/eventService';
 
 const PAGE_SIZE = 10;
 
+const EVENT_STATUS = {
+  1: {
+    label: 'Novo',
+    color: '#1D4ED8',
+    background: '#DBEAFE',
+    icon: 'time-outline',
+  },
+  2: {
+    label: 'Recusado',
+    color: '#B91C1C',
+    background: '#FEE2E2',
+    icon: 'close-circle-outline',
+  },
+  3: {
+    label: 'Em reavaliação',
+    color: '#C2410C',
+    background: '#FFEDD5',
+    icon: 'refresh-circle-outline',
+  },
+  4: {
+    label: 'Aprovado',
+    color: '#15803D',
+    background: '#DCFCE7',
+    icon: 'checkmark-circle-outline',
+  },
+};
+
+function getEventStatus(status) {
+  const names = {
+    new: 1,
+    refused: 2,
+    reavaluate: 3,
+    revaluate: 3,
+    approved: 4,
+  };
+
+  const key =
+    typeof status === 'string'
+      ? names[status.toLowerCase()] ?? Number(status)
+      : Number(status);
+
+  return EVENT_STATUS[key] || {
+    label: 'Desconhecido',
+    color: '#64748B',
+    background: '#F1F5F9',
+    icon: 'help-circle-outline',
+  };
+}
+
+function isRefused(status) {
+  return (
+    Number(status) === 2 ||
+    String(status).toLowerCase() === 'refused'
+  );
+}
+
 function getPhotoUri(photo) {
   if (!photo || typeof photo !== 'string') {
     return null;
@@ -28,19 +86,21 @@ function getPhotoUri(photo) {
 
   const value = photo.trim();
 
-  // Caso a API já retorne um Data URI.
   if (value.startsWith('data:image/')) {
     return value;
   }
 
-  // Caso retorne apenas o Base64.
   return `data:image/jpeg;base64,${value.replace(/\s/g, '')}`;
 }
 
-function EventCard({ event }) {
+function EventCard({
+  event,
+  onRevaluate,
+  revaluating,
+}) {
   const photoUri = getPhotoUri(event.photo);
-
   const points = Number(event.points ?? 0);
+  const status = getEventStatus(event.status);
 
   return (
     <View style={styles.card}>
@@ -57,6 +117,7 @@ function EventCard({ event }) {
             size={42}
             color="#94A3B8"
           />
+
           <Text style={styles.noPhotoText}>
             Foto indisponível
           </Text>
@@ -64,6 +125,30 @@ function EventCard({ event }) {
       )}
 
       <View style={styles.cardContent}>
+        <View style={styles.statusRow}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: status.background },
+            ]}
+          >
+            <Ionicons
+              name={status.icon}
+              size={16}
+              color={status.color}
+            />
+
+            <Text
+              style={[
+                styles.statusText,
+                { color: status.color },
+              ]}
+            >
+              {status.label}
+            </Text>
+          </View>
+        </View>
+
         <Text style={styles.description}>
           {event.description || 'Sem descrição'}
         </Text>
@@ -79,6 +164,46 @@ function EventCard({ event }) {
             {points.toLocaleString('pt-BR')} pontos
           </Text>
         </View>
+
+        {isRefused(event.status) && (
+          <View style={styles.revaluationContainer}>
+            <Text style={styles.refusedMessage}>
+              Este evento foi recusado. Você pode
+              solicitar uma nova avaliação.
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.revaluationButton,
+                revaluating && styles.disabledButton,
+              ]}
+              onPress={() => onRevaluate(event)}
+              disabled={revaluating}
+            >
+              {revaluating ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="refresh-outline"
+                    size={19}
+                    color="#FFFFFF"
+                  />
+
+                  <Text style={styles.revaluationButtonText}>
+                    Solicitar reavaliação
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {Number(event.status) === 3 && (
+          <Text style={styles.pendingMessage}>
+            Sua solicitação de reavaliação está pendente.
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -94,6 +219,9 @@ export default function EventListScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+
+  const [revaluatingId, setRevaluatingId] = useState(null);
+  const revaluationInProgress = useRef(false);
 
   const loadEvents = useCallback(async (
     page = 1,
@@ -124,11 +252,13 @@ export default function EventListScreen() {
       setTotalItems(total);
 
       setTotalPages(
-        Math.max(1, Math.ceil(total / (size || PAGE_SIZE)))
+        Math.max(
+          1,
+          Math.ceil(total / (size || PAGE_SIZE))
+        )
       );
 
       setPageIndex(page);
-
     } catch (err) {
       setError(
         err.message || 'Não foi possível carregar os eventos.'
@@ -145,6 +275,60 @@ export default function EventListScreen() {
     }, [loadEvents])
   );
 
+  const handleRevaluate = (event) => {
+    if (revaluationInProgress.current) return;
+
+    Alert.alert(
+      'Solicitar reavaliação',
+      'Deseja solicitar uma nova avaliação deste evento?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Solicitar',
+          onPress: async () => {
+            if (revaluationInProgress.current) return;
+
+            revaluationInProgress.current = true;
+            setRevaluatingId(event.id);
+
+            try {
+              await eventService.revaluateEvent(event.id);
+
+              // Atualização imediata da interface.
+              setEvents(prev =>
+                prev.map(item =>
+                  item.id === event.id
+                    ? { ...item, status: 3 }
+                    : item
+                )
+              );
+
+              Alert.alert(
+                'Solicitação enviada',
+                'Seu evento foi enviado para reavaliação.'
+              );
+
+              // Busca o status atualizado na API.
+              await loadEvents(pageIndex, true);
+            } catch (err) {
+              Alert.alert(
+                'Erro',
+                err.message ||
+                  'Não foi possível solicitar a reavaliação.'
+              );
+            } finally {
+              revaluationInProgress.current = false;
+              setRevaluatingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handlePrevious = () => {
     if (pageIndex > 1 && !loading) {
       loadEvents(pageIndex - 1);
@@ -157,13 +341,14 @@ export default function EventListScreen() {
     }
   };
 
-  if (loading) {
+  if (loading && events.length === 0) {
     return (
       <View style={styles.center}>
         <ActivityIndicator
           size="large"
           color="#203A6F"
         />
+
         <Text style={styles.loadingText}>
           Carregando eventos...
         </Text>
@@ -175,9 +360,13 @@ export default function EventListScreen() {
     <View style={styles.container}>
       <FlatList
         data={events}
-        keyExtractor={(item) => String(item.id)}
+        keyExtractor={item => String(item.id)}
         renderItem={({ item }) => (
-          <EventCard event={item} />
+          <EventCard
+            event={item}
+            onRevaluate={handleRevaluate}
+            revaluating={revaluatingId === item.id}
+          />
         )}
         contentContainerStyle={styles.listContent}
         refreshControl={
@@ -201,7 +390,11 @@ export default function EventListScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons
-              name={error ? 'alert-circle-outline' : 'images-outline'}
+              name={
+                error
+                  ? 'alert-circle-outline'
+                  : 'images-outline'
+              }
               size={52}
               color="#94A3B8"
             />
@@ -239,6 +432,7 @@ export default function EventListScreen() {
                   size={18}
                   color="#FFFFFF"
                 />
+
                 <Text style={styles.pageButtonText}>
                   Anterior
                 </Text>
@@ -260,6 +454,7 @@ export default function EventListScreen() {
                 <Text style={styles.pageButtonText}>
                   Próxima
                 </Text>
+
                 <Ionicons
                   name="chevron-forward"
                   size={18}
@@ -323,6 +518,22 @@ const styles = StyleSheet.create({
   cardContent: {
     padding: 16,
   },
+  statusRow: {
+    flexDirection: 'row',
+    marginBottom: 14,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
   description: {
     fontSize: 15,
     color: '#334155',
@@ -343,6 +554,38 @@ const styles = StyleSheet.create({
     color: '#203A6F',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  revaluationContainer: {
+    marginTop: 18,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  refusedMessage: {
+    color: '#B91C1C',
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  revaluationButton: {
+    height: 46,
+    borderRadius: 9,
+    backgroundColor: '#203A6F',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+  },
+  revaluationButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  pendingMessage: {
+    marginTop: 14,
+    fontSize: 13,
+    color: '#C2410C',
+    fontWeight: '500',
   },
   pagination: {
     flexDirection: 'row',

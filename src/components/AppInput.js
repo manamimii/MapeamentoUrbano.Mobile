@@ -50,7 +50,7 @@ export default function AppInput({
             style={styles.toggle}
           >
             <Text style={styles.toggleText}>
-              {visible ? 'Hide' : 'Show'}
+              {visible ? 'Esconder' : 'Mostrar'}
             </Text>
           </Pressable>
         )}

@@ -134,9 +134,9 @@ export default function EventScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>New Event</Text>
+            <Text style={styles.title}>Novo Evento</Text>
             <Text style={styles.subtitle}>
-              Capture and submit a report
+              Capture e envie um relatório
             </Text>
           </View>
         </View>
@@ -154,20 +154,20 @@ export default function EventScreen() {
           ) : (
             <View style={styles.placeholder}>
               <Text style={styles.cameraIcon}>📷</Text>
-              <Text style={styles.muted}>Take a photograph</Text>
+              <Text style={styles.muted}>Tire uma foto</Text>
             </View>
           )}
         </TouchableOpacity>
 
         <AppButton
-          title={photo ? 'Retake Photo' : 'Open Camera'}
+          title={photo ? 'Capturar Novamente' : 'Abrir Câmera'}
           variant="outline"
           onPress={takePhoto}
           disabled={loading || locating}
           style={{ marginTop: 12 }}
         />
 
-        <Text style={styles.label}>GPS Location</Text>
+        <Text style={styles.label}>Localização GPS</Text>
 
         <View style={styles.locationBox}>
           {locating ? (
@@ -183,7 +183,7 @@ export default function EventScreen() {
             </>
           ) : (
             <Text style={styles.muted}>
-              No coordinates captured
+              Nenhuma coordenada capturada
             </Text>
           )}
         </View>
@@ -198,8 +198,8 @@ export default function EventScreen() {
 
         <View style={{ marginTop: 24 }}>
           <AppInput
-            label="Description"
-            placeholder="Describe what happened..."
+            label="Descrição"
+            placeholder="Descreva o que aconteceu..."
             value={description}
             onChangeText={setDescription}
             multiline
@@ -207,7 +207,7 @@ export default function EventScreen() {
         </View>
 
         <AppButton
-          title="Submit Event"
+          title="Enviar Evento"
           onPress={submitEvent}
           loading={loading}
           disabled={locating || !photo || !coordinates}

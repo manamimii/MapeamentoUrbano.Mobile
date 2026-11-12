@@ -53,15 +53,15 @@ export default function LoginScreen({ navigation }) {
     };
 
     if (!email.trim()) {
-      validation.email = 'Email is required';
+      validation.email = 'O E-mail é obrigatório';
     } else if (
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
     ) {
-      validation.email = 'Enter a valid email address';
+      validation.email = 'Insira um endereço de e-mail válido';
     }
 
     if (!password) {
-      validation.password = 'Password is required';
+      validation.password = 'A senha é obrigatória';
     }
 
     setErrors(validation);
@@ -125,12 +125,12 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <AuthLayout
-      title="Welcome back"
-      subtitle="Sign in to continue reporting events"
+      title="Bem-Vindo"
+      subtitle="Faça login para continuar relatando eventos"
     >
       <AppInput
-        label="Email address"
-        placeholder="you@example.com"
+        label="E-mail"
+        placeholder="seu@examplo.com"
         value={email}
         onChangeText={handleEmailChange}
         keyboardType="email-address"
@@ -139,8 +139,8 @@ export default function LoginScreen({ navigation }) {
       />
 
       <AppInput
-        label="Password"
-        placeholder="Enter your password"
+        label="Senha"
+        placeholder="Senha"
         value={password}
         onChangeText={handlePasswordChange}
         secureTextEntry
@@ -159,7 +159,7 @@ export default function LoginScreen({ navigation }) {
       ) : null}
 
       <AppButton
-        title="Sign In"
+        title="Entrar"
         onPress={handleLogin}
         loading={loading}
         style={{ marginTop: 12 }}
@@ -167,14 +167,14 @@ export default function LoginScreen({ navigation }) {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Don't have an account?
+          Não tem uma conta?
         </Text>
 
         <TouchableOpacity
           onPress={() => navigation.navigate('Register')}
         >
           <Text style={styles.link}>
-            Create Account
+            Criar Conta
           </Text>
         </TouchableOpacity>
       </View>

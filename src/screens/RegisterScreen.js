@@ -28,19 +28,19 @@ const handleRegister = async () => {
   const validation = {};
 
   if (!form.name.trim()) {
-    validation.name = 'Name is required';
+    validation.name = 'O Nome é obrigatório';
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-    validation.email = 'Enter a valid email';
+    validation.email = 'Insira um E-mail válido';
   }
 
   if (form.password.length < 8) {
-    validation.password = 'Use at least 8 characters';
+    validation.password = 'A Senha deve ter no mínimo 8 caracteres';
   }
 
   if (form.password !== form.confirmPassword) {
-    validation.confirmPassword = 'Passwords do not match';
+    validation.confirmPassword = 'As Senhas não são iguais';
   }
 
   setErrors(validation);
@@ -53,7 +53,7 @@ const handleRegister = async () => {
   setLoading(true);
 
   try {
-    console.log('Starting user registration...');
+    console.log('Iniciando registro de usuário...');
 
     const response = await authService.register(
       form.name.trim(),
@@ -64,10 +64,10 @@ const handleRegister = async () => {
     console.log('Registration successful:', response);
 
     Alert.alert(
-      'Account created',
-      'You can now sign in.',
+      'Conta Criada',
+      'Você já pode logar.',
       [{
-        text: 'Continue',
+        text: 'Continuar',
         onPress: () => navigation.navigate('Login'),
       }]
     );
@@ -110,12 +110,12 @@ const handleRegister = async () => {
 
   return (
     <AuthLayout
-      title="Create account"
-      subtitle="Join Event Reporter to start submitting reports"
+      title="Criar Conta"
+      subtitle="Junte-se ao Event Reporter para começar a enviar relatórios"
     >
       <AppInput
-        label="Full name"
-        placeholder="Your full name"
+        label="Nome Completo"
+        placeholder="Seu Nome Completo"
         value={form.name}
         onChangeText={value => updateField('name', value)}
         autoCapitalize="words"
@@ -124,8 +124,8 @@ const handleRegister = async () => {
       />
 
       <AppInput
-        label="Email address"
-        placeholder="you@example.com"
+        label="E-mail"
+        placeholder="seu@exemplo.com"
         value={form.email}
         onChangeText={value => updateField('email', value)}
         keyboardType="email-address"
@@ -134,8 +134,8 @@ const handleRegister = async () => {
       />
 
       <AppInput
-        label="Password"
-        placeholder="Create a password"
+        label="Senha"
+        placeholder="Crie uma Senha"
         value={form.password}
         onChangeText={value => updateField('password', value)}
         secureTextEntry
@@ -144,8 +144,8 @@ const handleRegister = async () => {
       />
 
       <AppInput
-        label="Confirm password"
-        placeholder="Repeat your password"
+        label="Confirme sua Senha"
+        placeholder="Repita sua Senha"
         value={form.confirmPassword}
         onChangeText={value =>
           updateField('confirmPassword', value)
@@ -155,7 +155,7 @@ const handleRegister = async () => {
       />
 
       <AppButton
-        title="Create Account"
+        title="Criar Conta"
         onPress={handleRegister}
         loading={loading}
         style={{ marginTop: 10 }}
@@ -163,11 +163,11 @@ const handleRegister = async () => {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Already have an account?
+          Já tem uma conta?
         </Text>
 
         <AppButton
-          title="Sign In"
+          title="Logar"
           variant="outline"
           onPress={() => navigation.navigate('Login')}
           style={{ marginTop: 14 }}
